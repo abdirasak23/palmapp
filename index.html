@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palm Payment Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #02166d 0%, #0d0775 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Floating background elements */
+        .bg-decoration {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .bg-decoration:nth-child(1) {
+            top: -150px;
+            left: -150px;
+            animation-delay: 0s;
+        }
+
+        .bg-decoration:nth-child(2) {
+            bottom: -150px;
+            right: -150px;
+            animation-delay: 3s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+
+        .startng {
+            position: relative;
+            z-index: 10;
+        }
+
+        .startng button {
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #0c19a5, #5945a0);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px rgba(76, 175, 80, 0.3);
+            min-width: 200px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .startng button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .startng button:hover::before {
+            left: 100%;
+        }
+
+        .startng button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(76, 175, 80, 0.4);
+        }
+
+        .startng button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 20px;
+            padding: 0;
+            max-width: 450px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            transform: scale(0.7) translateY(50px);
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-header {
+            padding: 30px 30px 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .modal-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .modal-icon.loading {
+            background: linear-gradient(135deg, #01036b, #1d4ed8);
+            animation: pulse 2s infinite;
+        }
+
+        .modal-icon.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .modal-icon.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .modal-icon.waiting {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .modal-subtitle {
+            font-size: 16px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .modal-body {
+            padding: 0 30px 20px;
+        }
+
+        .payment-details {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .payment-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .payment-row:last-child {
+            margin-bottom: 0;
+            padding-top: 12px;
+            border-top: 2px solid #e5e7eb;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .payment-label {
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .payment-value {
+            color: #1f2937;
+            font-weight: 600;
+        }
+
+        .countdown-timer {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .countdown-timer .icon {
+            font-size: 20px;
+        }
+
+        .modal-footer {
+            padding: 20px 30px 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            min-width: 120px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #6b7280;
+            border: 2px solid #e5e7eb;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .success-animation {
+            animation: successBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes successBounce {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .checkmark {
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            animation: checkmark 0.8s ease-in-out forwards;
+        }
+
+        @keyframes checkmark {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .confetti {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .confetti-piece {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            animation: confetti-fall 3s linear forwards;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-decoration"></div>
+    <div class="bg-decoration"></div>
+
+    <div class="startng">
+        <button>Pay $99.99</button>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="paymentModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-icon loading" id="modalIcon">
+                    <div class="spinner"></div>
+                </div>
+                <h2 class="modal-title" id="modalTitle">Processing Payment...</h2>
+                <p class="modal-subtitle" id="modalSubtitle">Please wait while we process your payment request.</p>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be inserted here -->
+            </div>
+            <div class="modal-footer" id="modalFooter">
+                <!-- Buttons will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'https://gfqzzamwcewcoihbwuwm.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmcXp6YW13Y2V3Y29paGJ3dXdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1MjQ4MjQsImV4cCI6MjA3NDEwMDgyNH0.WcoOzI08tcIcwl4gtyPY2AWjw74e23ijkLcTTqiSYCM';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Hard-coded payment information
+        const PAYMENT_DATA = {
+            user_id: '588e0e8d-01a8-4e7f-9575-c10b22efc990',
+            user_name: 'work.abdirasak@gmail.com',
+            amount: 99.99,
+            product_name: 'Premium Service',
+        };
+
+        let currentTransaction = null;
+
+        // Modal utility functions
+        function showModal() {
+            const modal = document.getElementById('paymentModal');
+            modal.classList.add('active');
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('paymentModal');
+            modal.classList.remove('active');
+        }
+
+        function updateModal(type, title, subtitle, bodyContent = '', footerButtons = '') {
+            const icon = document.getElementById('modalIcon');
+            const titleEl = document.getElementById('modalTitle');
+            const subtitleEl = document.getElementById('modalSubtitle');
+            const body = document.getElementById('modalBody');
+            const footer = document.getElementById('modalFooter');
+
+            // Update icon
+            icon.className = `modal-icon ${type}`;
+            
+            if (type === 'loading') {
+                icon.innerHTML = '<div class="spinner"></div>';
+            } else if (type === 'success') {
+                icon.innerHTML = `
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                        <path class="checkmark" d="m9 12 2 2 4-4"></path>
+                    </svg>
+                `;
+                icon.classList.add('success-animation');
+            } else if (type === 'waiting') {
+                icon.innerHTML = '⏱️';
+            } else if (type === 'error') {
+                icon.innerHTML = '❌';
+            }
+
+            titleEl.textContent = title;
+            subtitleEl.textContent = subtitle;
+            body.innerHTML = bodyContent;
+            footer.innerHTML = footerButtons;
+        }
+
+        function createPaymentDetails(transactionId, amount, productName) {
+            return `
+                <div class="payment-details">
+                    <div class="payment-row">
+                        <span class="payment-label">Transaction ID:</span>
+                        <span class="payment-value">${transactionId}</span>
+                    </div>
+                    <div class="payment-row">
+                        <span class="payment-label">Product:</span>
+                        <span class="payment-value">${productName}</span>
+                    </div>
+                    <div class="payment-row">
+                        <span class="payment-label">Amount:</span>
+                        <span class="payment-value">$${amount}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createCountdownTimer(remainingSeconds) {
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            return `
+                <div class="countdown-timer">
+                    <span class="icon">⏰</span>
+                    <span>Time remaining: ${minutes}:${seconds.toString().padStart(2, '0')}</span>
+                </div>
+            `;
+        }
+
+        function createConfetti() {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            
+            const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+            
+            for (let i = 0; i < 50; i++) {
+                const piece = document.createElement('div');
+                piece.className = 'confetti-piece';
+                piece.style.left = Math.random() * 100 + '%';
+                piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+                piece.style.animationDelay = Math.random() * 3 + 's';
+                confetti.appendChild(piece);
+            }
+            
+            return confetti;
+        }
+
+        // Core payment functions
+        function generateTransactionId() {
+            return 'TXN_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        async function createPendingPayment() {
+            try {
+                const transactionId = generateTransactionId();
+                
+                const paymentData = {
+                    user_id: PAYMENT_DATA.user_id,
+                    user_name: PAYMENT_DATA.user_name,
+                    amount: PAYMENT_DATA.amount,
+                    product_name: PAYMENT_DATA.product_name,
+                    timestamp: new Date().toISOString(),
+                    status: 'pending',
+                    is_paid: false,
+                    payment_method: 'mobile_payment',
+                    transaction_id: transactionId,
+                    notification_sent: false
+                };
+
+                const { data, error } = await supabase
+                    .from('paid_table')
+                    .insert([paymentData])
+                    .select();
+
+                if (error) {
+                    return { success: false, error: error.message };
+                }
+
+                return { success: true, data: data[0], transactionId };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function checkPaymentStatus(transactionId) {
+            try {
+                const { data, error } = await supabase
+                    .from('paid_table')
+                    .select('*')
+                    .eq('transaction_id', transactionId)
+                    .single();
+
+                if (error) {
+                    return { success: false, error: error.message };
+                }
+
+                return { success: true, data };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function simulatePaymentCompletion(transactionId) {
+            try {
+                const { data, error } = await supabase
+                    .from('paid_table')
+                    .update({ 
+                        is_paid: true, 
+                        status: 'completed',
+                        payment_completed_at: new Date().toISOString()
+                    })
+                    .eq('transaction_id', transactionId)
+                    .select();
+
+                if (error) {
+                    return { success: false, error: error.message };
+                }
+
+                return { success: true, data };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        function startPaymentMonitoring(transactionId, maxAttempts = 60) {
+            let attempts = 0;
+            const button = document.querySelector('.startng button');
+            
+            const checkInterval = setInterval(async () => {
+                attempts++;
+                
+                const remainingTime = Math.max(0, (maxAttempts - attempts) * 5);
+                const bodyContent = createPaymentDetails(transactionId, PAYMENT_DATA.amount, PAYMENT_DATA.product_name) +
+                                 createCountdownTimer(remainingTime);
+                
+                updateModal(
+                    'waiting',
+                    'Waiting for Payment',
+                    'Complete the payment using your mobile app to proceed.',
+                    bodyContent,
+                    `<button class="btn btn-secondary" onclick="cancelPayment()">Cancel Payment</button>`
+                );
+                
+                const result = await checkPaymentStatus(transactionId);
+                
+                if (result.success && result.data.is_paid) {
+                    clearInterval(checkInterval);
+                    
+                    // Show success modal with confetti
+                    const successBody = createPaymentDetails(transactionId, PAYMENT_DATA.amount, PAYMENT_DATA.product_name) +
+                        `<div style="text-align: center; margin-top: 20px;">
+                            <p style="color: #10b981; font-weight: 600; font-size: 16px;">
+                                ✅ Payment completed successfully at ${new Date(result.data.payment_completed_at).toLocaleString()}
+                            </p>
+                        </div>`;
+                    
+                    updateModal(
+                        'success',
+                        'Payment Successful!',
+                        'Your payment has been processed successfully. Thank you for your purchase!',
+                        successBody,
+                        `<button class="btn btn-primary" onclick="closeSuccessModal()">Continue</button>`
+                    );
+
+                    // Add confetti effect
+                    const modal = document.querySelector('.modal');
+                    const confetti = createConfetti();
+                    modal.appendChild(confetti);
+                    
+                    // Remove confetti after animation
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, 3000);
+
+                    // Update main button
+                    button.textContent = 'Payment Completed ✓';
+                    button.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                    
+                    return;
+                }
+                
+                if (attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    
+                    updateModal(
+                        'error',
+                        'Payment Timeout',
+                        'The payment request has timed out. Please try again or contact support.',
+                        createPaymentDetails(transactionId, PAYMENT_DATA.amount, PAYMENT_DATA.product_name),
+                        `<button class="btn btn-primary" onclick="closeTimeoutModal()">Try Again</button>
+                         <button class="btn btn-secondary" onclick="hideModal()">Close</button>`
+                    );
+                }
+            }, 5000);
+            
+            return checkInterval;
+        }
+
+        function resetButton() {
+            const button = document.querySelector('.startng button');
+            button.textContent = `Pay $${PAYMENT_DATA.amount}`;
+            button.style.background = 'linear-gradient(135deg, #4CAF50, #45a049)';
+            button.disabled = false;
+            currentTransaction = null;
+        }
+
+        async function handlePayment() {
+            try {
+                const button = document.querySelector('.startng button');
+                
+                if (currentTransaction) {
+                    return;
+                }
+                
+                button.disabled = true;
+                button.textContent = 'Processing...';
+
+                // Show loading modal
+                showModal();
+                updateModal(
+                    'loading',
+                    'Creating Payment Request',
+                    'Please wait while we prepare your payment...',
+                    '',
+                    ''
+                );
+
+                // Simulate loading delay
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                const result = await createPendingPayment();
+
+                if (result.success) {
+                    currentTransaction = result.transactionId;
+                    
+                    // Show payment created modal
+                    const bodyContent = createPaymentDetails(result.transactionId, PAYMENT_DATA.amount, PAYMENT_DATA.product_name);
+                    
+                    updateModal(
+                        'success',
+                        'Payment Request Created!',
+                        'Your payment request has been created successfully. Please complete the payment using your mobile app.',
+                        bodyContent,
+                        `<button class="btn btn-primary" onclick="startMonitoring('${result.transactionId}')">Start Monitoring</button>`
+                    );
+                    
+                } else {
+                    updateModal(
+                        'error',
+                        'Payment Failed',
+                        'Failed to create payment request. Please try again.',
+                        `<p style="color: #ef4444; text-align: center; margin: 20px 0;">${result.error}</p>`,
+                        `<button class="btn btn-primary" onclick="hideModal(); resetButton();">Try Again</button>`
+                    );
+                }
+
+            } catch (error) {
+                updateModal(
+                    'error',
+                    'Payment Error',
+                    'An unexpected error occurred. Please try again.',
+                    `<p style="color: #ef4444; text-align: center; margin: 20px 0;">${error.message}</p>`,
+                    `<button class="btn btn-primary" onclick="hideModal(); resetButton();">Try Again</button>`
+                );
+            }
+        }
+
+        function startMonitoring(transactionId) {
+            startPaymentMonitoring(transactionId);
+        }
+
+        function cancelPayment() {
+            if (currentTransaction) {
+                hideModal();
+                resetButton();
+                currentTransaction = null;
+            }
+        }
+
+        function closeSuccessModal() {
+            hideModal();
+            setTimeout(() => {
+                resetButton();
+            }, 2000);
+        }
+
+        function closeTimeoutModal() {
+            hideModal();
+            resetButton();
+        }
+
+        // Global test functions
+        window.testCompletePayment = async function(transactionId) {
+            if (!transactionId && currentTransaction) {
+                transactionId = currentTransaction;
+            }
+            
+            if (transactionId) {
+                await simulatePaymentCompletion(transactionId);
+            }
+        };
+
+        window.getPendingPayments = async function() {
+            try {
+                const { data, error } = await supabase
+                    .from('paid_table')
+                    .select('*')
+                    .eq('is_paid', false);
+                    
+                if (!error) {
+                    console.log('Pending payments:', data);
+                }
+                return data;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            const payButton = document.querySelector('.startng button');
+            if (payButton) {
+                payButton.addEventListener('click', handlePayment);
+            }
+
+            // Close modal when clicking outside
+            document.getElementById('paymentModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    if (!currentTransaction) {
+                        hideModal();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
