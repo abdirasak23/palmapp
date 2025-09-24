@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PayFlow - Digital Wallet</title>
+    <title>PalmPay - Digital Wallet</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -676,6 +676,28 @@
         .toast-warning { background: #ff9800; }
         .toast-info { background: #2196f3; }
 
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        .no-transactions {
+            text-align: center;
+            padding: 40px 20px;
+            color: #718096;
+        }
+
+        .no-transactions i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
         /* Animations */
         @keyframes slideInUp {
             from {
@@ -696,6 +718,10 @@
         @keyframes pulse {
             0%, 100% { opacity: 0.7; }
             50% { opacity: 1; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         /* Mobile responsiveness */
@@ -731,7 +757,7 @@
             <div class="profile-icon" onclick="showProfile()">
                 <i class="fas fa-user"></i>
             </div>
-            <div class="app-title">PayFlow</div>
+            <div class="app-title">PalmPay</div>
             <div class="notification-icon" onclick="showNotifications()">
                 <i class="fas fa-bell"></i>
                 <div class="notification-dot"></div>
@@ -786,25 +812,12 @@
         <!-- Recent Transactions -->
         <div class="recent-transactions">
             <div class="section-title">Recent Transactions</div>
-            <div class="transaction-item outgoing" onclick="viewTransaction('maria')">
-                <div class="transaction-icon transaction-outgoing">
-                    <i class="fas fa-arrow-up"></i>
+            <div id="transactionsList">
+                <!-- Dynamic transaction history will be loaded here -->
+                <div style="text-align: center; padding: 20px; color: #718096;">
+                    <div class="loading-spinner"></div>
+                    <div style="margin-top: 12px;">Loading transactions...</div>
                 </div>
-                <div class="transaction-details">
-                    <div class="transaction-name">Maria Railsatts</div>
-                    <div class="transaction-time">Today 5:42 PM</div>
-                </div>
-                <div class="transaction-amount amount-outgoing">-$1,000</div>
-            </div>
-            <div class="transaction-item incoming" onclick="viewTransaction('stan')">
-                <div class="transaction-icon transaction-incoming">
-                    <i class="fas fa-arrow-down"></i>
-                </div>
-                <div class="transaction-details">
-                    <div class="transaction-name">Stan T Comcast Card</div>
-                    <div class="transaction-time">Yesterday 2:30 PM</div>
-                </div>
-                <div class="transaction-amount amount-incoming">+$2,000</div>
             </div>
         </div>
 
@@ -879,14 +892,182 @@
         let notificationInterval = null;
         let activeNotifications = new Map();
         let isProcessingPayment = false;
+        let transactionHistoryCache = [];
+        let lastTransactionUpdate = 0;
 
-        // Initialize the notification system
+        // Initialize the notification system and transaction history
         function initializeNotificationSystem() {
             console.log('Initializing PayFlow Notification System...');
             startNotificationMonitoring();
+            loadTransactionHistory();
             preloadNotificationSound();
             updateNotificationBadge();
             console.log('Notification system initialized successfully');
+        }
+
+        // Load and display transaction history from database
+        async function loadTransactionHistory() {
+            try {
+                console.log('Loading transaction history...');
+                
+                const { data, error } = await supabase
+                    .from('paid_table')
+                    .select('*')
+                    .order('timestamp', { ascending: false })
+                    .limit(20); // Limit to recent 20 transactions
+
+                if (error) {
+                    console.error('Error loading transaction history:', error);
+                    displayNoTransactionsMessage();
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    transactionHistoryCache = data;
+                    displayTransactionHistory(data);
+                    lastTransactionUpdate = Date.now();
+                    console.log(`Loaded ${data.length} transactions`);
+                } else {
+                    displayNoTransactionsMessage();
+                }
+            } catch (error) {
+                console.error('Error in loadTransactionHistory:', error);
+                displayNoTransactionsMessage();
+            }
+        }
+
+        // Display transaction history in the UI
+        function displayTransactionHistory(transactions) {
+            const transactionsList = document.getElementById('transactionsList');
+            transactionsList.innerHTML = '';
+
+            transactions.forEach(transaction => {
+                const transactionElement = createTransactionElement(transaction);
+                transactionsList.appendChild(transactionElement);
+            });
+        }
+
+        // Create individual transaction element
+        function createTransactionElement(transaction) {
+            const transactionItem = document.createElement('div');
+            const isOutgoing = transaction.status === 'completed' && transaction.is_paid;
+            const isPending = transaction.status === 'pending';
+            
+            transactionItem.className = `transaction-item ${isOutgoing ? 'outgoing' : 'incoming'}`;
+            transactionItem.onclick = () => viewTransactionDetails(transaction);
+
+            const formattedAmount = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(Math.abs(transaction.amount));
+
+            const timeAgo = getTimeAgo(transaction.timestamp);
+            const displayName = transaction.user_name || transaction.product_name || 'Unknown';
+
+            // Determine transaction type and styling
+            let transactionIcon, transactionClass, amountClass, amountPrefix;
+            
+            if (isPending) {
+                transactionIcon = 'fas fa-clock';
+                transactionClass = 'transaction-pending';
+                amountClass = 'amount-pending';
+                amountPrefix = '';
+            } else if (isOutgoing) {
+                transactionIcon = 'fas fa-arrow-up';
+                transactionClass = 'transaction-outgoing';
+                amountClass = 'amount-outgoing';
+                amountPrefix = '-';
+            } else {
+                transactionIcon = 'fas fa-arrow-down';
+                transactionClass = 'transaction-incoming';
+                amountClass = 'amount-incoming';
+                amountPrefix = '+';
+            }
+
+            transactionItem.innerHTML = `
+                <div class="transaction-icon ${transactionClass}">
+                    <i class="${transactionIcon}"></i>
+                </div>
+                <div class="transaction-details">
+                    <div class="transaction-name">${displayName}</div>
+                    <div class="transaction-time">${timeAgo} ${isPending ? '(Pending)' : ''}</div>
+                </div>
+                <div class="transaction-amount ${amountClass}">${amountPrefix}${formattedAmount}</div>
+            `;
+
+            return transactionItem;
+        }
+
+        // Display message when no transactions are found
+        function displayNoTransactionsMessage() {
+            const transactionsList = document.getElementById('transactionsList');
+            transactionsList.innerHTML = `
+                <div class="no-transactions">
+                    <i class="fas fa-receipt"></i>
+                    <div style="margin-top: 16px; font-size: 18px; font-weight: 600;">No Transactions Yet</div>
+                    <div style="margin-top: 8px; font-size: 14px;">Your transaction history will appear here</div>
+                </div>
+            `;
+        }
+
+        // View detailed transaction information
+        function viewTransactionDetails(transaction) {
+            const formattedAmount = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(Math.abs(transaction.amount));
+
+            const details = `
+                Transaction Details:
+                
+                Amount: ${formattedAmount}
+                Status: ${transaction.status}
+                User: ${transaction.user_name || 'Unknown'}
+                Product: ${transaction.product_name || 'N/A'}
+                Date: ${new Date(transaction.timestamp).toLocaleString()}
+                Transaction ID: ${transaction.transaction_id}
+            `;
+
+            showToast('Transaction details logged to console', 'info');
+            console.log('Transaction Details:', transaction);
+        }
+
+        // Refresh transaction history periodically
+        async function refreshTransactionHistory() {
+            // Only refresh if it's been more than 30 seconds since last update
+            if (Date.now() - lastTransactionUpdate < 30000) {
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('paid_table')
+                    .select('*')
+                    .order('timestamp', { ascending: false })
+                    .limit(20);
+
+                if (error) {
+                    console.error('Error refreshing transaction history:', error);
+                    return;
+                }
+
+                // Check if there are new transactions
+                if (data && data.length > 0) {
+                    const newTransactionIds = data.map(t => t.transaction_id);
+                    const cachedIds = transactionHistoryCache.map(t => t.transaction_id);
+                    
+                    const hasNewTransactions = newTransactionIds.some(id => !cachedIds.includes(id));
+                    
+                    if (hasNewTransactions) {
+                        transactionHistoryCache = data;
+                        displayTransactionHistory(data);
+                        lastTransactionUpdate = Date.now();
+                        console.log('Transaction history refreshed with new data');
+                    }
+                }
+            } catch (error) {
+                console.error('Error in refreshTransactionHistory:', error);
+            }
         }
 
         // Start monitoring for payment notifications
@@ -899,9 +1080,10 @@
             
             notificationInterval = setInterval(() => {
                 checkForPendingPayments();
+                refreshTransactionHistory(); // Also refresh transaction history
             }, NOTIFICATION_CONFIG.checkInterval);
             
-            console.log('Started monitoring for payment notifications');
+            console.log('Started monitoring for payment notifications and transaction updates');
         }
 
         // Check database for pending payments
@@ -929,6 +1111,7 @@
                     }
                     
                     updateNotificationBadge();
+                    refreshTransactionHistory(); // Refresh transaction history when new payments come in
                 }
             } catch (error) {
                 console.error('Error in checkForPendingPayments:', error);
@@ -1067,6 +1250,11 @@
                 showPaymentSuccess(notification, paymentData);
                 updateAppBalance(-paymentData.amount);
                 
+                // Refresh transaction history immediately after payment
+                setTimeout(() => {
+                    refreshTransactionHistory();
+                }, 1000);
+                
                 setTimeout(() => {
                     hideNotification(notificationId);
                 }, 3000);
@@ -1172,6 +1360,12 @@
                 
                 hideNotification(`notification-${transactionId}`);
                 showToast('Payment declined', 'info');
+                
+                // Refresh transaction history after declining
+                setTimeout(() => {
+                    refreshTransactionHistory();
+                }, 1000);
+                
                 console.log(`Payment declined: ${transactionId}`);
                 
             } catch (error) {
@@ -1380,10 +1574,6 @@
             showToast(`Contact: ${name} selected`, 'info');
         }
 
-        function viewTransaction(id) {
-            showToast(`Transaction details for ${id}`, 'info');
-        }
-
         // Initialize app when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             generateContacts();
@@ -1398,6 +1588,8 @@
             checkNow: checkForPendingPayments,
             processPayment: processPayment,
             declinePayment: declinePayment,
+            refreshHistory: refreshTransactionHistory,
+            loadHistory: loadTransactionHistory,
             config: NOTIFICATION_CONFIG
         };
 
@@ -1420,6 +1612,12 @@
                 paymentData: testPayment,
                 timestamp: Date.now()
             });
+        };
+
+        // Manual refresh function for testing
+        window.refreshTransactions = function() {
+            loadTransactionHistory();
+            showToast('Transaction history refreshed', 'info');
         };
     </script>
 </body>
